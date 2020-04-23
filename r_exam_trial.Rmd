@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #Load libraries
 library(pacman)
-p_load(tidyverse, tidyr, reshape2, data.table, dplyr, Hmisc, viridis)
+p_load(tidyverse, tidyr, reshape2, data.table, dplyr, Hmisc, viridis, brms, bayesplot)
 
 #Set working directory and load in the data
 #setwd("C:/Users/Natacha/Dropbox/Natacha/Aarhus Universitet/4. Semester/Social and Cultural Dynamics in Cognition")
@@ -243,26 +243,38 @@ information <- d %>%
  summarise(gender_count=n()/3, mean_age = mean(age), sd_age = sd(age), min = min(age), max = max(age))
 
 #Define the model
-m_e <- bf(Empathy ~ 0 + condition + (1|ID))
-m_d <- bf(Distress ~ 0 + condition + (1|ID))
+m_e <- bf(empathy ~ 0 + condition + (1|ID))
+m_d <- bf(distress ~ 0 + condition + (1|ID))
 
 # Ask which priors need to be defined
 get_prior(m_e, data = d, family = gaussian)
-get_prior(m_e, data = d, family = gaussian)
+get_prior(m_d, data = d, family = gaussian)
 
 
 ################## I NEED TO FIX EVERYTHING UNDER THIS LINE ##########################
 
 # Define the prior
-prior_mind <- c(
-prior(normal(0,1), class = Intercept), #Intercept is still AltercentricIntrusion
-prior(normal(0,.3), class = b), #Beta is Mind reading
-prior(normal(1,2), class = sigma))
+prior<- c(
+prior(normal(49,5), class = b), 
+prior(normal(2,1), class = sd), 
+prior(normal(1,.5), class = sigma))
 
 # Draw the consequences of priors AND likelihood
-m_mind_prior_only <- brm(m_mind,
-patients,
-prior = prior_mind,
+emp_only <- brm(m_e,
+d,
+prior = prior,
+sample_prior = "only",
+iter = 2000,
+warmup = 1000,
+chains = 2,
+cores = 2,
+control = list(
+  adapt_delta = 0.99,
+  max_treedepth = 20))
+
+dis_only <- brm(m_d,
+d,
+prior = prior,
 sample_prior = "only",
 iter = 2000,
 warmup = 1000,
@@ -273,30 +285,15 @@ control = list(
   max_treedepth = 20))
 
 # Prior Predictive Check
-pp_check(m_mind_prior_only, nsamples = 100)
-
-#Check for warnings after the pp_check
-summary(MODEL NAME)
-
-# - trace plots and trace rank plots
-color_scheme_set("viridis")
-mcmc_trace(m1,  pars = "b_condition1", "b_condition2") + theme_classic()
-mcmc_rank_overlay(m1, pars = "b_Intercept", "b_condition1") + theme_classic()
-
-# Has the model learned? The posteriors have moved or gotten more confident than the priors
-plot(hypothesis(m5,"condition1> 0"))
-plot(hypothesis(m5,"condition2 > 0"))
-plot(hypothesis(m5,"condition3> 0"))
-
-# The posteriors have moved or gotten more confident than the priors
-plot(hypothesis(m1,"condition1 > 0"))
+pp_check(emp_only, nsamples = 100)
+pp_check(dis_only, nsamples = 100)
 
 # Draw the consequences of priors AND likelihood
-m_mind_prior <- brm(m_mind,
-patients,
-prior = prior_mind,
+m_emp <- brm(m_e,
+d,
+prior = prior,
 sample_prior = T,
-ilter = 2000,
+iter = 2000,
 warmup = 1000,
 chains = 2,
 cores = 2,
@@ -305,22 +302,64 @@ control = list(
   max_treedepth = 20)) #Adapt_delta = "How much should you correct your steps/-size/mass etc. default 0.8, riccardo's default = 0.99
 #Max tree depth = How many steps in the future should you look into to avoid u-turns? default = 15, Riccardo's default = 20
 
-# Posterior Predictive Check
-pp_check(m_mind_prior, nsamples = 100)
+m_dis <- brm(m_d,
+d,
+prior = prior,
+sample_prior = T,
+iter = 2000,
+warmup = 1000,
+chains = 2,
+cores = 2,
+control = list(
+  adapt_delta = 0.99,
+  max_treedepth = 20))
 
-#cheking the model
-m_mind_prior
+# Posterior Predictive Check
+pp_check(m_emp, nsamples = 100)
+pp_check(m_dis, nsamples = 100)
+
+# - trace plots and trace rank plots
+color_scheme_set("viridis")
+mcmc_trace(m_emp) + theme_classic()
+mcmc_rank_overlay(m_emp) + theme_classic()
+
+mcmc_trace(m_dis) + theme_classic()
+mcmc_rank_overlay(m_dis) + theme_classic()
+
+#Check for warnings after the pp_check
+summary(m_emp)
+summary(m_dis)
+
+# Has the model learned? The posteriors have moved or gotten more confident than the priors
+plot(hypothesis(m_emp, "conditioncontrol > 0"))
+plot(hypothesis(m_emp, "conditionimagine_other > 0"))
+plot(hypothesis(m_emp, "conditionimagine_self > 0"))
+
+plot(hypothesis(m_dis, "conditioncontrol > 0"))
+plot(hypothesis(m_dis, "conditionimagine_other > 0"))
+plot(hypothesis(m_dis, "conditionimagine_self > 0"))
 
 # Hypothesis testing + updating check
-plot(hypothesis(m_mind_prior,
-           "MindReading > 0"))
 
-hypothesis(m_mind_prior,
-           "MindReading > 0")
+plot(hypothesis(m_emp,"conditionimagine_other > conditionimagine_self"))
+hypothesis(m_emp,"conditionimagine_other > conditionimagine_self")
+
+plot(hypothesis(m_emp,"conditionimagine_other > conditioncontrol"))
+hypothesis(m_emp,"conditionimagine_other > conditioncontrol")
+
+plot(hypothesis(m_dis, "conditionimagine_self > conditionimagine_other"))
+hypothesis(m_dis,"conditionimagine_self > conditionimagine_other")
+
+plot(hypothesis(m_dis,"conditionimagine_self > conditioncontrol"))
+hypothesis(m_dis,"conditionimagine_self > conditioncontrol")
+
 
 #Plots
-conditional_effects(m_mind_prior)
-plot(conditional_effects(m_mind_prior), points=T)
+conditional_effects(m_emp)
+plot(conditional_effects(m_emp), points=T)
+
+conditional_effects(m_dis)
+plot(conditional_effects(m_dis), points=T)
 
 ```
 
@@ -328,8 +367,20 @@ plot(conditional_effects(m_mind_prior), points=T)
 
 ```{r}
 
-d <- filter(d, condition == "imagine_other")
-d <- filter(d, condition == "imagine_self")
+d_other <- filter(d, condition == "imagine_other")
+
+d_self <- filter(d, condition == "imagine_self")
+
+
+d_scale <- d_other %>% mutate(
+  scale_empathy = scale(empathy))
+
+d_scale1 <- d_self %>% mutate(
+  scale_distress = scale(distress))
+
+
+#Virker ikke
+d_scaled <- rbind(d_scale, d_scale1)
 
 #scale
 
