@@ -13,7 +13,7 @@ library(pacman)
 p_load(tidyverse, tidyr, reshape2, data.table, dplyr, Hmisc, viridis)
 
 #Set working directory and load in the data
-setwd("C:/Users/Natacha/Dropbox/Natacha/Aarhus Universitet/4. Semester/Social and Cultural Dynamics in Cognition")
+#setwd("C:/Users/Natacha/Dropbox/Natacha/Aarhus Universitet/4. Semester/Social and Cultural Dynamics in Cognition")
 d1 <- read_csv("other-self-obj.csv")
 d2 <- read_csv("self-obj-other.csv")
 d3 <- read_csv("obj-other-self.csv")
@@ -174,14 +174,6 @@ d3$condition[d3$condition == "1"] <- "control"
 #Binding the dataframes together
 d_n <- rbind(d1,d2,d3)
 
-#Finding the number of participants, gender distribution, mean age, sd of mean age, min and max age
-d_n$ID <- factor(d_n$ID)
-unique(d_n$ID)
-
-information <- d_n %>%
- group_by(gender) %>%
- summarise(gender_count=n()/3, mean_age = mean(age), sd_age = sd(age))
-
 #Then placing the conditions in front of the values (function is borrowed)
 
 moveme <- function (invec, movecommand) {
@@ -235,12 +227,13 @@ write.csv(d_n,"preprossesing_exam.csv")
  
 ```
 
-#Bayes analysis
+#Analysis
 
 ```{r}
 
 #load in the data
 d <- read_csv("preprossesing_exam.csv")
+d$X1 <- NULL
 
 #How many participants, gender age, age sd
 unique(d$ID)
@@ -331,10 +324,6 @@ plot(conditional_effects(m_mind_prior), points=T)
 
 ```
 
-
-
-
-
 #Are empathy and distress correlated?
 
 ```{r}
@@ -344,8 +333,6 @@ d <- filter(d, condition == "imagine_self")
 
 #scale
 
-
-
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
