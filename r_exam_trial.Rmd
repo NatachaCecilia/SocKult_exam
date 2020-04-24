@@ -243,8 +243,8 @@ information <- d %>%
  summarise(gender_count=n()/3, mean_age = mean(age), sd_age = sd(age), min = min(age), max = max(age))
 
 #Define the model
-m_e <- bf(empathy ~ 0 + condition + (1|ID))
-m_d <- bf(distress ~ 0 + condition + (1|ID))
+m_e <- bf(empathy ~ 0 + condition + (0 + condition|ID))
+m_d <- bf(distress ~ 0 + condition + (0 + condition|ID))
 
 # Ask which priors need to be defined
 get_prior(m_e, data = d, family = gaussian)
@@ -254,20 +254,20 @@ get_prior(m_d, data = d, family = gaussian)
 ################## I NEED TO FIX EVERYTHING UNDER THIS LINE ##########################
 
 # Define the prior
-prior<- c(
-prior(normal(49,5), class = b), 
-prior(normal(2,1), class = sd), 
-prior(normal(1,.5), class = sigma))
+prior <- c(
+  prior(normal(49,5), class = b),
+  prior(normal(0,1), class = sd),
+  prior(normal(1,1), class = sigma))
 
 # Draw the consequences of priors AND likelihood
 emp_only <- brm(m_e,
 d,
 prior = prior,
 sample_prior = "only",
-iter = 2000,
+iter = 4000,
 warmup = 1000,
-chains = 2,
-cores = 2,
+chains = 4,
+cores = 4,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
@@ -276,10 +276,10 @@ dis_only <- brm(m_d,
 d,
 prior = prior,
 sample_prior = "only",
-iter = 2000,
+iter = 4000,
 warmup = 1000,
-chains = 2,
-cores = 2,
+chains = 4,
+cores = 4,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
@@ -293,10 +293,10 @@ m_emp <- brm(m_e,
 d,
 prior = prior,
 sample_prior = T,
-iter = 2000,
+iter = 4000,
 warmup = 1000,
-chains = 2,
-cores = 2,
+chains = 4,
+cores = 4,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20)) #Adapt_delta = "How much should you correct your steps/-size/mass etc. default 0.8, riccardo's default = 0.99
@@ -306,10 +306,10 @@ m_dis <- brm(m_d,
 d,
 prior = prior,
 sample_prior = T,
-iter = 2000,
+iter = 4000,
 warmup = 1000,
-chains = 2,
-cores = 2,
+chains = 4,
+cores = 4,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
@@ -367,22 +367,71 @@ plot(conditional_effects(m_dis), points=T)
 
 ```{r}
 
-d_other <- filter(d, condition == "imagine_other")
+d_scale <- subset(d, condition == "imagine_other" | condition == "imagine_self") %>%
+  mutate(
+  scaled_empathy = scale(empathy),
+  scaled_distress = scale(distress))
 
-d_self <- filter(d, condition == "imagine_self")
+d_scale$ID <- factor(d_scale$ID)
+
+cor <- bf(scaled_empathy ~ scaled_distress + (1|ID))
+get_prior(cor, data = d_scale, family = gaussian)
+
+# Define the prior
+prior_cor <- c(
+  prior(normal(0, 0.1), class = b),
+  prior(normal(0,0.1), class = sd),
+  prior(normal(0,.5), class = sigma))
+
+# Draw the consequences of priors AND likelihood
+cor_only <- brm(cor,
+d_scale,
+prior = prior_cor,
+sample_prior = "only",
+iter = 4000,
+warmup = 1000,
+chains = 4,
+cores = 4,
+control = list(
+  adapt_delta = 0.99,
+  max_treedepth = 20))
+
+# Prior Predictive Check
+pp_check(cor_only, nsamples = 100)
+
+# Draw the consequences of priors AND likelihood on the data
+m_cor <- brm(cor,
+d_scale,
+prior = prior_cor,
+sample_prior = T,
+iter = 4000,
+warmup = 1000,
+chains = 4,
+cores = 4,
+control = list(
+  adapt_delta = 0.99,
+  max_treedepth = 20))
+
+# posterior predictive check
+pp_check(m_cor, nsamples = 100)
+
+# - trace plots and trace rank plots
+color_scheme_set("viridis")
+mcmc_trace(m_cor) + theme_classic()
+mcmc_rank_overlay(m_cor) + theme_classic()
+
+#Check for warnings after the pp_check
+summary(m_cor)
+
+#hypothesis testing
+plot(hypothesis(m_cor,"scaled_distress > 0"))
+hypothesis(m_cor,"scaled_distress > 0")
 
 
-d_scale <- d_other %>% mutate(
-  scale_empathy = scale(empathy))
+#Plots
+conditional_effects(m_cor)
+plot(conditional_effects(m_cor), points=T)
 
-d_scale1 <- d_self %>% mutate(
-  scale_distress = scale(distress))
-
-
-#Virker ikke
-d_scaled <- rbind(d_scale, d_scale1)
-
-#scale
 
 ```
 
