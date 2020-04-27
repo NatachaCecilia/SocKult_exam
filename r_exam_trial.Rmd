@@ -44,11 +44,13 @@ d1 <- d1[rowSums(is.na(d1)) != ncol(d1), ]
 
 #2 participants are excluded due to only pressing 1 all the way through 
 d1 <- d1[-c(8,9),]
+d1 <- d1[-18,]
+d2 <- d2[-28,]
 
 #Make a column called participant ID just with numbers from 1-x
 d1 <- mutate(d1, ID = seq(nrow(d1)))
-d2 <- mutate(d2, ID = seq(27,60))
-d3 <- mutate(d3, ID = seq(61,93))
+d2 <- mutate(d2, ID = seq(26,58))
+d3 <- mutate(d3, ID = seq(59,91))
 
 #Placing it before all the other columns
 d1 <- d1[,c(ncol(d1),1:(ncol(d1)-1))]
@@ -175,7 +177,6 @@ d3$condition[d3$condition == "1"] <- "control"
 d_n <- rbind(d1,d2,d3)
 
 #Then placing the conditions in front of the values (function is borrowed)
-
 moveme <- function (invec, movecommand) {
   movecommand <- lapply(strsplit(strsplit(movecommand, ";")[[1]], 
                                  ",|\\s+"), function(x) x[x != ""])
@@ -222,6 +223,7 @@ for (i in 1:nrow(d_n)){
   d_n$distress[i] <- sum(d_n[i, c(6, 10, 12, 13, 14, 17, 19, 20, 21, 23, 25, 26)])
 }
 
+
 #Save as csv
 write.csv(d_n,"preprossesing_exam.csv")
  
@@ -235,12 +237,16 @@ write.csv(d_n,"preprossesing_exam.csv")
 d <- read_csv("preprossesing_exam.csv")
 d$X1 <- NULL
 
+
 #How many participants, gender age, age sd
 unique(d$ID)
 
 information <- d %>%
  group_by(gender) %>%
- summarise(gender_count=n()/3, mean_age = mean(age), sd_age = sd(age), min = min(age), max = max(age))
+ summarise(gender_count=n()/3)
+
+mean(d$age)
+sd(d$age)
 
 #Define the model
 m_e <- bf(empathy ~ 0 + condition + (0 + condition|ID))
@@ -250,13 +256,11 @@ m_d <- bf(distress ~ 0 + condition + (0 + condition|ID))
 get_prior(m_e, data = d, family = gaussian)
 get_prior(m_d, data = d, family = gaussian)
 
-
-################## I NEED TO FIX EVERYTHING UNDER THIS LINE ##########################
-
 # Define the prior
 prior <- c(
   prior(normal(49,5), class = b),
-  prior(normal(0,1), class = sd),
+  prior(lkj(5), class = cor),
+  prior(normal(0,.1), class = sd),
   prior(normal(1,1), class = sigma))
 
 # Draw the consequences of priors AND likelihood
@@ -355,8 +359,9 @@ hypothesis(m_dis,"conditionimagine_self > conditioncontrol")
 
 
 #Plots
-conditional_effects(m_emp)
+conditional_effects(m_emp)+
 plot(conditional_effects(m_emp), points=T)
+
 
 conditional_effects(m_dis)
 plot(conditional_effects(m_dis), points=T)
@@ -379,19 +384,22 @@ get_prior(cor, data = d_scale, family = gaussian)
 
 # Define the prior
 prior_cor <- c(
-  prior(normal(0, 0.1), class = b),
+  prior(normal(0,1), class = b),
   prior(normal(0,0.1), class = sd),
-  prior(normal(0,.5), class = sigma))
+  prior(normal(0,0.1), class = sigma))
+
+
+mean(d_scale6$empathy)
 
 # Draw the consequences of priors AND likelihood
 cor_only <- brm(cor,
 d_scale,
 prior = prior_cor,
 sample_prior = "only",
-iter = 4000,
+iter = 2000,
 warmup = 1000,
-chains = 4,
-cores = 4,
+chains = 2,
+cores = 2,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
