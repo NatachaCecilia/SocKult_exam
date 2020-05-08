@@ -229,7 +229,9 @@ write.csv(d_n,"preprossesing_exam.csv")
  
 ```
 
-#Analysis
+###Analysis
+
+#H1
 
 ```{r}
 
@@ -258,10 +260,10 @@ get_prior(m_d, data = d, family = gaussian)
 
 # Define the prior
 prior <- c(
-  prior(normal(49,5), class = b),
-  prior(lkj(5), class = cor),
-  prior(normal(0,.1), class = sd),
-  prior(normal(1,1), class = sigma))
+    prior(normal(49,10), class = b),
+    prior(lkj(5), class = cor),
+    prior(normal(0,5), class = sd),
+    prior(normal(0,10), class = sigma))
 
 # Draw the consequences of priors AND likelihood
 emp_only <- brm(m_e,
@@ -332,16 +334,24 @@ mcmc_rank_overlay(m_dis) + theme_classic()
 
 #Check for warnings after the pp_check
 summary(m_emp)
+
+p_load(quantreg)
+coef(m_emp) #Get coef
+
 summary(m_dis)
 
 # Has the model learned? The posteriors have moved or gotten more confident than the priors
 plot(hypothesis(m_emp, "conditioncontrol > 0"))
+#plot(hypothesis(m_emp, "conditioncontrol > 0", class = "sd"))
+#Look at the sd, see riccardos code
+
 plot(hypothesis(m_emp, "conditionimagine_other > 0"))
 plot(hypothesis(m_emp, "conditionimagine_self > 0"))
-
 plot(hypothesis(m_dis, "conditioncontrol > 0"))
 plot(hypothesis(m_dis, "conditionimagine_other > 0"))
 plot(hypothesis(m_dis, "conditionimagine_self > 0"))
+
+##Plot sd??? - see video
 
 # Hypothesis testing + updating check
 
@@ -359,16 +369,42 @@ hypothesis(m_dis,"conditionimagine_self > conditioncontrol")
 
 
 #Plots
-conditional_effects(m_emp)+
-plot(conditional_effects(m_emp), points=T)
-
+conditional_effects(m_emp)
 
 conditional_effects(m_dis)
-plot(conditional_effects(m_dis), points=T)
+
+
+#I CANNOT MAKE IT WORK!!
+
+xx <- predict(m_emp, summary=T)
+d_hej <- cbind(d,xx)
+d_hej$ID <- as.factor(d_hej$ID)
+ggplot(d_hej) + 
+  geom_point(aes(condition, empathy, color = ID, group=ID)) + 
+  geom_boxplot(aes(condition, empathy, color = ID))
+  
+
+X <- hypothesis(m_emp, "conditionimagine_other > conditionimagine_self", group = "ID", scope = "coef")
+X$hypothesis %>%
+  left_join(distinct(d_hej, Group = ID)) %>% 
+  mutate(id = factor(Group), Empathy = Estimate) %>%
+  ggplot(aes(Empathy, id)) +
+  geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
+  geom_point() + theme_classic()
+
+X <- hypothesis(SocConformity_m, "Feedback > 0",group = "ID", scope = "coef")
+X$hypothesis %>%
+  left_join(distinct(d, Group = ID)) %>% 
+  mutate(id = factor(Group), Conformity = Estimate) %>%
+  ggplot(aes(Conformity, id)) +
+  geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
+  geom_point() + theme_classic()
+
+
 
 ```
 
-#Are empathy and distress correlated?
+#H2 - Are empathy and distress correlated?
 
 ```{r}
 
@@ -379,17 +415,14 @@ d_scale <- subset(d, condition == "imagine_other" | condition == "imagine_self")
 
 d_scale$ID <- factor(d_scale$ID)
 
-cor <- bf(scaled_empathy ~ scaled_distress + (1|ID))
+cor <- bf(scaled_empathy ~ scaled_distress, family = "gaussian")
 get_prior(cor, data = d_scale, family = gaussian)
 
 # Define the prior
 prior_cor <- c(
   prior(normal(0,1), class = b),
-  prior(normal(0,0.1), class = sd),
+  prior(normal(0,1), class = Intercept),
   prior(normal(0,0.1), class = sigma))
-
-
-mean(d_scale6$empathy)
 
 # Draw the consequences of priors AND likelihood
 cor_only <- brm(cor,
