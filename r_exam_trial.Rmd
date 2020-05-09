@@ -311,6 +311,7 @@ control = list(
 
 m_dis <- brm(m_d,
 d,
+family = poisson,
 prior = prior,
 sample_prior = T,
 iter = 2000,
@@ -336,24 +337,16 @@ mcmc_rank_overlay(m_dis) + theme_classic()
 #Check for warnings after the pp_check
 summary(m_emp)
 
-#p_load(quantreg)
-#coef(m_emp) #Get coef
-
 summary(m_dis)
 
 # Has the model learned? The posteriors have moved or gotten more confident than the priors
 plot(hypothesis(m_emp, "conditioncontrol > 0"))
-
 plot(hypothesis(m_emp, "conditionimagine_other > 0"))
-plot(hypothesis(m_emp, "conditionimagine_other > 0", class = "sd", group ="ID"))
-
-
 plot(hypothesis(m_emp, "conditionimagine_self > 0"))
+
 plot(hypothesis(m_dis, "conditioncontrol > 0"))
 plot(hypothesis(m_dis, "conditionimagine_other > 0"))
 plot(hypothesis(m_dis, "conditionimagine_self > 0"))
-
-##Plot sd??? - see video
 
 # Hypothesis testing + updating check
 
@@ -370,9 +363,15 @@ plot(hypothesis(m_dis,"conditionimagine_self > conditioncontrol"))
 hypothesis(m_dis,"conditionimagine_self > conditioncontrol")
 
 #Exponentiate the values from summary- Wee see the values given in the conditiona effects
-exp(3.78)
-exp(3.90)
-exp(3.89)
+#Empathy
+exp(3.78) #control
+exp(3.90) #Imagine other
+exp(3.89) #Imagine self
+
+#Distress
+exp(3.71) #Control
+exp(3.89) #imagine other
+exp(3.92) #imagine self
 
 #Plots
 conditional_effects(m_emp)
@@ -382,27 +381,55 @@ conditional_effects(m_dis)
 
 #More visualisation
 
-xx <- predict(m_emp, summary=T)
-d_hej <- cbind(d,xx)
-d_hej$ID <- as.factor(d_hej$ID)
+#Empathy
+emp <- predict(m_emp, summary=T)
+d_emp <- cbind(d,emp)
+d_emp$ID <- as.factor(d_emp$ID)
   
 
-X <- hypothesis(m_emp, "conditionimagine_other > conditionimagine_self", group = "ID", scope = "coef")
-X$hypothesis %>%
-  left_join(distinct(d_hej, Group = ID)) %>% 
-  mutate(id = factor(Group), Empathy = Estimate) %>%
-  ggplot(aes(Empathy, id)) +
+hyp1 <- hypothesis(m_emp, "conditionimagine_other > conditionimagine_self", group = "ID", scope = "coef")
+hyp1$hypothesis %>%
+  left_join(distinct(d_emp, Group = ID)) %>% 
+  mutate(id = factor(Group), empathy = Estimate) %>%
+  ggplot(aes(empathy, id)) +
   geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
-  geom_point() + theme_classic()
+  geom_point() + theme_classic() +
+  ggtitle("Imagine other > Imagine self")
 
-X <- hypothesis(SocConformity_m, "Feedback > 0",group = "ID", scope = "coef")
-X$hypothesis %>%
-  left_join(distinct(d, Group = ID)) %>% 
-  mutate(id = factor(Group), Conformity = Estimate) %>%
-  ggplot(aes(Conformity, id)) +
+hyp2 <- hypothesis(m_emp, "conditionimagine_other > conditioncontrol", group = "ID", scope = "coef")
+hyp2$hypothesis %>%
+  left_join(distinct(d_emp, Group = ID)) %>% 
+  mutate(id = factor(Group), empathy = Estimate) %>%
+  ggplot(aes(empathy, id)) +
   geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
-  geom_point() + theme_classic()
+  geom_point() + theme_classic() +
+  ggtitle("Imagine other > Objective")
 
+#Distress
+dis <- predict(m_dis, summary=T)
+d_dis <- cbind(d,dis)
+d_dis$ID <- as.factor(d_dis$ID)
+  
+
+hyp3 <- hypothesis(m_dis, "conditionimagine_self > conditionimagine_other", group = "ID", scope = "coef")
+hyp3$hypothesis %>%
+  left_join(distinct(d_dis, Group = ID)) %>% 
+  mutate(id = factor(Group), distress = Estimate) %>%
+  ggplot(aes(distress, id)) +
+  geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
+  geom_point() + theme_classic() +
+  ggtitle("Imagine self > Imagine other")
+
+hyp4 <- hypothesis(m_dis, "conditionimagine_self > conditioncontrol", group = "ID", scope = "coef")
+hyp4$hypothesis %>%
+  left_join(distinct(d_dis, Group = ID)) %>% 
+  mutate(id = factor(Group), distress = Estimate) %>%
+  ggplot(aes(distress, id)) +
+  geom_errorbarh(aes(xmin = CI.Lower, xmax = CI.Upper)) +
+  geom_point() + theme_classic() +
+  ggtitle("Imagine self > Objective")
+
+  
 
 
 ```
@@ -475,6 +502,13 @@ hypothesis(m_cor,"scaled_distress > 0")
 #Plots
 conditional_effects(m_cor)
 plot(conditional_effects(m_cor), points=T)
+
+ggplot(d_scale, aes(scaled_distress, scaled_empathy, colour = condition)) +
+  geom_point() + 
+  theme_classic() +
+  geom_smooth(method=lm, aes(scaled_distress, scaled_empathy, colour = condition) +
+  ggtitle("Correlation between distress and empathy")
+
 
 
 ```
