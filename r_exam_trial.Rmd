@@ -239,7 +239,6 @@ write.csv(d_n,"preprossesing_exam.csv")
 d <- read_csv("preprossesing_exam.csv")
 d$X1 <- NULL
 
-
 #How many participants, gender age, age sd
 unique(d$ID)
 
@@ -255,37 +254,38 @@ m_e <- bf(empathy ~ 0 + condition + (0 + condition|ID))
 m_d <- bf(distress ~ 0 + condition + (0 + condition|ID))
 
 # Ask which priors need to be defined
-get_prior(m_e, data = d, family = gaussian)
+get_prior(m_e, data = d, family = poisson)
 get_prior(m_d, data = d, family = gaussian)
 
 # Define the prior
 prior <- c(
-    prior(normal(49,10), class = b),
+    prior(normal(1,2), class = b),
     prior(lkj(5), class = cor),
-    prior(normal(0,5), class = sd),
-    prior(normal(0,10), class = sigma))
+    prior(normal(0,.5), class = sd))
 
 # Draw the consequences of priors AND likelihood
 emp_only <- brm(m_e,
 d,
+family = poisson,
 prior = prior,
 sample_prior = "only",
-iter = 4000,
+iter = 2000,
 warmup = 1000,
-chains = 4,
-cores = 4,
+chains = 2,
+cores = 2,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
 
 dis_only <- brm(m_d,
 d,
+family = poisson,
 prior = prior,
 sample_prior = "only",
-iter = 4000,
+iter = 2000,
 warmup = 1000,
-chains = 4,
-cores = 4,
+chains = 2,
+cores = 2,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
@@ -297,12 +297,13 @@ pp_check(dis_only, nsamples = 100)
 # Draw the consequences of priors AND likelihood
 m_emp <- brm(m_e,
 d,
+family = poisson,
 prior = prior,
 sample_prior = T,
-iter = 4000,
+iter = 2000,
 warmup = 1000,
-chains = 4,
-cores = 4,
+chains = 2,
+cores = 2,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20)) #Adapt_delta = "How much should you correct your steps/-size/mass etc. default 0.8, riccardo's default = 0.99
@@ -312,10 +313,10 @@ m_dis <- brm(m_d,
 d,
 prior = prior,
 sample_prior = T,
-iter = 4000,
+iter = 2000,
 warmup = 1000,
-chains = 4,
-cores = 4,
+chains = 2,
+cores = 2,
 control = list(
   adapt_delta = 0.99,
   max_treedepth = 20))
@@ -326,7 +327,7 @@ pp_check(m_dis, nsamples = 100)
 
 # - trace plots and trace rank plots
 color_scheme_set("viridis")
-mcmc_trace(m_emp) + theme_classic()
+mcmc_trace(m_emp, pars = "xxxxx") + theme_classic()
 mcmc_rank_overlay(m_emp) + theme_classic()
 
 mcmc_trace(m_dis) + theme_classic()
@@ -335,17 +336,18 @@ mcmc_rank_overlay(m_dis) + theme_classic()
 #Check for warnings after the pp_check
 summary(m_emp)
 
-p_load(quantreg)
-coef(m_emp) #Get coef
+#p_load(quantreg)
+#coef(m_emp) #Get coef
 
 summary(m_dis)
 
 # Has the model learned? The posteriors have moved or gotten more confident than the priors
 plot(hypothesis(m_emp, "conditioncontrol > 0"))
-#plot(hypothesis(m_emp, "conditioncontrol > 0", class = "sd"))
-#Look at the sd, see riccardos code
 
 plot(hypothesis(m_emp, "conditionimagine_other > 0"))
+plot(hypothesis(m_emp, "conditionimagine_other > 0", class = "sd", group ="ID"))
+
+
 plot(hypothesis(m_emp, "conditionimagine_self > 0"))
 plot(hypothesis(m_dis, "conditioncontrol > 0"))
 plot(hypothesis(m_dis, "conditionimagine_other > 0"))
@@ -367,6 +369,10 @@ hypothesis(m_dis,"conditionimagine_self > conditionimagine_other")
 plot(hypothesis(m_dis,"conditionimagine_self > conditioncontrol"))
 hypothesis(m_dis,"conditionimagine_self > conditioncontrol")
 
+#Exponentiate the values from summary- Wee see the values given in the conditiona effects
+exp(3.78)
+exp(3.90)
+exp(3.89)
 
 #Plots
 conditional_effects(m_emp)
@@ -374,14 +380,11 @@ conditional_effects(m_emp)
 conditional_effects(m_dis)
 
 
-#I CANNOT MAKE IT WORK!!
+#More visualisation
 
 xx <- predict(m_emp, summary=T)
 d_hej <- cbind(d,xx)
 d_hej$ID <- as.factor(d_hej$ID)
-ggplot(d_hej) + 
-  geom_point(aes(condition, empathy, color = ID, group=ID)) + 
-  geom_boxplot(aes(condition, empathy, color = ID))
   
 
 X <- hypothesis(m_emp, "conditionimagine_other > conditionimagine_self", group = "ID", scope = "coef")
